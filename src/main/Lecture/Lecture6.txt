@@ -77,4 +77,118 @@
         객체 - HTTP 메시지 컨버터 - JSON 응답
 
     응답 - 정적 리소스, 뷰 템플릿
+        스프링(서버)에서 응답,요청 데이터를 만드는 방법은 크게 3가지
+        1. 정적 리소스
+        2. 뷰 템플릿, 서버 사이드 랜더링하는것, JSP,타임리프같은
+        3. HTTP 메시지 사용
+
+        1. 직접 url에 접근, basic/hello-form.html 이라 직접 접근
+        2. static은 정적인것 templates은 동적인것 주로 저장
+        타임리프 랜더링이 될때 ${}부분이 텍스트부분을 대체해버린다.
+
+    HTTP 응답 - HTTP API, 메시지 바디에 직접 입력
+        HTTP API, REST API 라고도 한다.
+        3. @ResponseBody + @Controller = @RestController
+        api만들때는 jsonV2방식을 많이 사용한다.
+
+        누가 이걸 대신 바꿔주나?
+        http 메세지에 있는걸 꺼내서 제이슨을 읽어서 문자열로바꿔주는 과정을 어떻게하는것일까???
+
+    HTTP 메시지 컨버터
+        뷰 템플릿으로 html을 생성해서 응답하는것보다 http api처럼 json 데이터를 http메시지 바디에서 직접 읽거나 쓰는경우
+        http 메시지 컨버터를 사용하면 편리하다.
+        http 메시지 컨버터는 무엇이고 어떤역할???
+
+        jsonconverter, stringconverter가 있어서 맞는 형식에 따라 다르게 작동
+
+        주요한 메시지 컨버터
+        1. ByteArrayHttpMessageConverter : byte[]데이터를 처리
+        아무 미디어타입 다 받는다.
+        2. StringHttpMessageConverter : 문자열데이터를 처리
+        String 처리, 아무 미디어타입 다 받는다
+        3. MappingJackson2HttpMessageConverter : 객체데이터를 처리
+        객체 또는 HashMap, application/json 미디어타입만 받는다
+
+        예시1)
+        content-type: application/json
+
+        @RequestMapping
+        void hello(@RequestBody String data) {}
+
+        이 경우에는 2번 컨버터가 작동! String으로 값이 넘어오니까 그리고 application/json을 받아줄 수 있으니까 작동 가능
+
+        예시2)
+        content-type: application/json
+
+        @RequestMapping
+        void hello(@RequestBody HelloData data) {}
+
+        객체니까 3번 컨버터 성립!
+
+        예시3)
+        content-type: text/html
+
+        @RequestMapping
+        void hello(@RequestBody HelloData data) {}
+
+        얘는 그냥 탈락! 객체여서 1,2번 처리 불가능한데 미디어타입(컨텐트타입)도 application/json이 아니니까 그러면 누가 어떻게 처리해???
+
+        메시지 컨버터는 어디서 작동해???
+
+    요청 매핑 핸들러 어뎁터 구조
+        @Controller 처리해주는것!
+
+        핸들러 어댑터에서 http 메시지 컨버터 작동한다.
+
+        동작 방식
+        1. 핸들러 어댑터가 호출된다. 그러면 컨트롤러를 호출해주어야 하는데, 그때마다 ArgumentResolver가 많은 파라미터를 처리해준다.
+        즉, RequestMappingHandlerAdaptor는 ArgumentResolver를 사용해서 파라미터를 처리해준다.
+        ArgumentResolver를 컨트롤러가 필요로하는 매개변수들을 처리한다. 처리한다는것은 필요한값들을 구해온다는 뜻이다.
+         파라미터값이 모두 준비되면 그때 컨트롤러를 호출해서 실행시킨다.
+        2. 핸들러 어댑터가 실제 컨트롤러를 호출(ArgumentResolver를 통해서 얻어온 파라미터를 넣어준다)
+        3. ReturnValueHandler가 반환값을 돌려준다. (여기서 컨버팅 작업을 다 해준다.)
+
+        아직도 http 메시지 컨버터가 나오지 않았는데
+
+        http메시지 컨버터는 ArgumentResolver, ReturnValueHandler에서 모두 사용된다.
+        RequestResponseBodyMethodProcessor가 있다 (인코딩, 디코딩 다 처리가능)
+
+        모두 인터페이스로 제공된다. 즉 확장에 대비해서 설계되어있다.
+
+        스프링은 확장 포인트를 아는것이 중요!
+
+    정리
+        로깅에는 SLF4J와 Logback 사용, SLF4J는 인터페이스, Logback은 구현체
+        @SLF4J 애너테이션 써도 무난하다.
+        로그 사용이 프린트문 찍는것 보다 훨씬 성능상 좋다.
+
+        요청 매핑은 contenttype으로도 매핑가능,
+
+        헤더관련 조회가능
+
+        HTTP 요청 데이터 조회하는 방법은 3가지
+            GET 쿼리파라미터
+            POST HTML Form
+            이 위에 2가지는 항상 request.getParameter()로 똑같이 처리가능
+            HTTP Message API
+            얘는 메시지 컨버터 사용
+
+        @RequestParam은 변수명 같으면 생략가능~
+
+        @ModelAttribute도 생략가능 한번에 객체로 딱 넣어줄 수 있다.
+
+        생략할시 원시타입은 @RequestParam으로 나머지는 @ModelAttribute로 인식한다
+
+        @RequestBody로 반환하면 메세지에 바로 들어간다. 이 사이에서 메시지 컨버터 작동
+
+        json같은 경우에도 원래는 objectvalue가지고 직접 변환해줘야 했지만 @Requestbody넣으면 jsonMessageConverter가 동작하면서 자동으로 처리해준다.
+
+        @RequestBody는 생략 불가능 -> @ModelAttribute로 인식한다. 생략되었는데 객체니까
+
+         응답 데이터도 3개
+             정적리소스 응답
+             뷰템플릿 사용해서 응답
+             메세지만들어서 응답
+
+         요청 매핑 핸들러 어뎁터 RequestMappingHandlerAdapter에 있다.
 
